@@ -1,6 +1,6 @@
 # CryptoCore 16 - Cryptographic Coprocessor
 
-CryptoCore 16 is a 16-bit cryptographic coprocessor that accelerates encryption operations by implementing them in hardware rather than software. It sits alongside a main CPU and handles computationally intensive cryptographic primitives such as:
+CryptoCore-16 is a 16-bit cryptographic coprocessor that accelerates encryption operations by implementing them in hardware rather than software. It sits alongside a main CPU and handles computationally intensive cryptographic primitives such as:
 
 - **Arithmetic operations** (ADD, SUB)
 - **Bitwise logic** (AND, OR, XOR, NOT)
@@ -39,9 +39,9 @@ Cryptographic algorithms require executing the same operations hundreds of thous
     Clock ─────────►│   16x16 Register File        │
     Reset ─────────►│   (Synchronous Read/Write)   │
     Ra[3:0] ───────►│                              │
-    Rb[3:0] ───────►│   Ra ──► ABUS[15:0]         │
-    Rd[3:0] ───────►│   Rb ──► BBUS[15:0]         │
-                    │   Rd ◄── RESULT[15:0]       │
+    Rb[3:0] ───────►│   Ra ──► ABUS[15:0]          │
+    Rd[3:0] ───────►│   Rb ──► BBUS[15:0]          │
+                    │   Rd ◄── RESULT[15:0]        │
                     │                              │
                     └────────┬──────────┬──────────┘
                              │          │
@@ -51,32 +51,32 @@ Cryptographic algorithms require executing the same operations hundreds of thous
                     │                                        │
                     │   Combinational Logic Block            │
                     │                                        │
-                    │  ┌──────────────────────────────────┐ │
-                    │  │         ALU Unit                 │ │
-    ABUS[15:0] ────────►│  ADD, SUB, AND, OR, XOR,       │ │
-    BBUS[15:0] ────────►│  NOT, MOV, NOP                 │ │
-    CTRL[3:0] ─────────►├─────────────┬─ alu_out1[15:0] │ │
-                    │  └─────────────┼──────────────────┘ │
-                    │                │                     │
-                    │  ┌─────────────┼──────────────────┐ │
-                    │  │         Shifter Unit          │ │
-    BBUS[15:0] ────────►│  ROR8, ROR4, SLL8           │ │
-    CTRL[3:0] ─────────►├─────────────┬─ sft_out2[15:0] │ │
-                    │  └─────────────┼──────────────────┘ │
-                    │                │                     │
-                    │  ┌─────────────┼──────────────────┐ │
-                    │  │    Non-Linear Lookup Unit     │ │
-    ABUS[15:0] ────────►│  S_Box1 + S_Box2             │ │
-                    │  │  (Substitution Tables)        │ │
-                    │  └─────────────┬─lut_out3[15:0] │ │
-                    │                │                     │
-                    │       ┌────────▼─────────┐          │
-                    │       │   Control MUX    │          │
-                    │       │   (CTRL-based    │          │
-                    │       │    selection)    │          │
-                    │       └────────┬─────────┘          │
-                    │                │                     │
-                    └────────────────┼─────────────────────┘
+                    │  ┌────────────────────────────────┐    │
+                    │  │         ALU Unit               │    │
+    ABUS[15:0] ────────►│  ADD, SUB, AND, OR, XOR,      │    │
+    BBUS[15:0] ────────►│  NOT, MOV, NOP                │    │
+    CTRL[3:0] ─────────►├────────────┬─ alu_out1[15:0]  │    │
+                    │   └────────────┼──────────────────┘    │
+                    │                │                       │ 
+                    │  ┌─────────────┼─────────────────┐     │
+                    │  │         Shifter Unit          │     │
+    BBUS[15:0] ────────►│  ROR8, ROR4, SLL8            │     │
+    CTRL[3:0] ─────────►├────────────┬─ sft_out2[15:0] │     │
+                    │  └─────────────┼─────────────────┘     │
+                    │                │                       │
+                    │  ┌─────────────┼──────────────────┐    │
+                    │  │    Non-Linear Lookup Unit      │    │
+    ABUS[15:0] ────────►│  S_Box1 + S_Box2              │    │
+                    │  │  (Substitution Tables)         │    │
+                    │  └─────────────┬─lut_out3[15:0]   │    │
+                    │                │                       │
+                    │       ┌────────▼─────────┐             │
+                    │       │   Control MUX    │             │
+                    │       │   (CTRL-based    │             │
+                    │       │    selection)    │             │
+                    │       └────────┬─────────┘             │
+                    │                │                       │
+                    └────────────────┼───────────────────────┘
                                      │
                                      ▼
                               RESULT[15:0]
