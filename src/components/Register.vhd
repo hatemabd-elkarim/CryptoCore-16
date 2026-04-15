@@ -3,17 +3,11 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.numeric_std.all;
 
 -- =========================================================
-
 -- Register File (16 x 16-bit registers)
-
 -- Supports:
-
 --   - Synchronous write
-
 --   - Synchronous read (registered outputs)
-
 --   - Reset output to zero
-
 -- =========================================================
 
 entity register_file is
@@ -56,13 +50,9 @@ signal REG_FILE: mem_type :=(
 begin	   
 	
 -- =========================================================
-
 -- WRITE OPERATION :
-
 -- Writes data into register Rd on rising edge of clock
-
 -- when write enable is active
-
 -- =========================================================
    write_operation: process(clock) 
    begin
@@ -74,12 +64,9 @@ begin
    end process;
 
 -- =========================================================
-
 -- READ OPERATION :
 -- Reads two registers (Ra, Rb) synchronously
-
--- If reset is active ? outputs zero
-
+-- If reset is active -> outputs zero
 -- =========================================================
    read_operation: process(clock)
    begin
