@@ -8,7 +8,12 @@ end entity;
 architecture sim of LUT_tb is
 signal LUT_in, LUT_out : std_logic_vector(7 downto 0);
 begin
-	DUT : entity LUT port map(LUT_in, LUT_out);
+	DUT : entity work.LUT
+		port map(
+			LUT_in => LUT_in,
+			LUT_out => LUT_out
+		); 
+		
 	process is
 	begin
 		for i in 0 to 255 loop
