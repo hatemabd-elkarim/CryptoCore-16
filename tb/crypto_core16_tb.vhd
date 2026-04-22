@@ -8,7 +8,8 @@ end entity;
 architecture behavior of tb_crypto is
 
     signal clock, reset : std_logic := '0';
-    signal CTRL, Ra, Rb, Rd : std_logic_vector(3 downto 0);
+    signal CTRL, Ra, Rb, Rd : std_logic_vector(3 downto 0);	 
+	signal ABUS, BBUS, RES : std_logic_vector(15 downto 0);
 
 begin
 
@@ -33,15 +34,6 @@ begin
         end loop;
     end process;
 
-    -- Reset process
-    reset_process : process
-    begin
-        reset <= '1';
-        wait for 10 ns;
-        reset <= '0';
-        wait;
-    end process;
-
     -- Stimulus
     stimulus_process : process
      begin
@@ -52,8 +44,11 @@ begin
         Ra <= "0001";
         Rb <= "0010";
         Rd <= "0011";
-        wait for 20 ns;
+        wait for 10 ns;
       end loop;
+	  
+	  reset <= '1';
+	  wait for 10 ns;
 
       wait;
     end process;
