@@ -32,15 +32,19 @@ LUT_UNIT: entity work.LUT
 
 	
 -- CONTROL LOGIC MUX: All ALU operations ctrl(3) is 0, LUT operation ctrl(1 downto 0) is 11, others are shifter operations or undefined
-CONTROL_MUX: process(CTRL, ALU_OUT, SHIFT_OUT, LUT_OUT)
+CONTROL_MUX: process(CTRL, ALU_OUT, SHIFT_OUT, LUT_OUT)	is
 begin
-    if CTRL(3) = '0' then
-        RES <= ALU_OUT;
-    elsif CTRL(1 downto 0) = "11" then
-        RES <= LUT_OUT;
-    else
-        RES <= SHIFT_OUT;
-    end if;
+    case(CTRL(3)) is
+ 		when '0' => 
+   			 RES <= ALU_OUT;
+  		when others => 
+    		case(CTRL) is
+    			when "1011" =>
+     				RES <= LUT_OUT;
+    			when others =>
+    				 RES <= SHIFT_OUT;
+    		end case;
+  end case;
 end process;  
 end architecture;
 	
