@@ -6,7 +6,7 @@ use IEEE.numeric_std.all;
 -- Register File (16 x 16-bit registers)
 -- Supports:
 --   - Synchronous write
---   - Synchronous read (registered outputs)
+--   - Asynchronous read (No latency)
 --   - Reset output to zero
 -- =========================================================
 
@@ -27,7 +27,7 @@ architecture Behavioral of register_file is
 -- 16 registers, each 16-bit wide
 type mem_type is array(0 to 15) of std_logic_vector(15 downto 0);
 
--- Register file memory with initial values 
+-- Register file memory with initial values (for simulation only)
 signal REG_FILE: mem_type :=( 
   0 => x"0001", 
   1 => x"c505",
@@ -50,35 +50,27 @@ signal REG_FILE: mem_type :=(
 begin	   
 	
 -- =========================================================
--- WRITE OPERATION :
+-- WRITE OPERATION :  
 -- Writes data into register Rd on rising edge of clock
 -- when write enable is active
 -- =========================================================
-   write_operation: process(clock) 
-   begin
-    if(rising_edge(clock)) then
-     if(RdWEn='1') then 
-     REG_FILE(to_integer(unsigned(Rd))) <= RES;
-     end if;
+   write_operation: process(clock)
+	begin
+    if rising_edge(clock) then
+        if reset = '1' then	-- syncronous reset, with higher priority
+            REG_FILE <= (others => x"0000");
+        elsif RdWEn = '1' then
+            REG_FILE(to_integer(unsigned(Rd))) <= RES;
+        end if;
     end if;
-   end process;
+	end process;
 
 -- =========================================================
 -- READ OPERATION :
--- Reads two registers (Ra, Rb) synchronously
--- If reset is active -> outputs zero
--- =========================================================
-   read_operation: process(clock)
-   begin
-    if(rising_edge(clock)) then
-     if(reset='1') then
-      SRCa <= x"0000";
-      SRCb <= x"0000";
-     else
-      SRCa <= REG_FILE(to_integer(unsigned(Ra)));
-      SRCb <= REG_FILE(to_integer(unsigned(Rb)));
-     end if;
-    end if;
-   end process;	  
+-- Reads two registers (Ra, Rb) Asynchronously (zero latency for cpu pipeline)
+-- ========================================================= 
+	SRCa <= REG_FILE(to_integer(unsigned(Ra)));
+		
+	SRCb <= REG_FILE(to_integer(unsigned(Rb)));
    
 end Behavioral;
