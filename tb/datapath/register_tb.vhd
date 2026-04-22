@@ -55,15 +55,8 @@ begin
     stim_proc : process
     begin
 
-        -- =========================
-        -- Reset
-        -- =========================
-        reset <= '1';
-        wait for clk_period;
-        reset <= '0';
-
         -- =====================================================
-        -- 1) TEST READ (Initial values)
+        -- 1) TEST READ (Before reset: Initial values, After reset: x0000)
         -- =====================================================
         -- Reading REG[1] and REG[2]
         Ra <= "0001";  -- REG[1] = x"C505"
@@ -77,7 +70,20 @@ begin
 
         assert (SRCb = x"3C07")
         report "Error in reading REG[2]" severity error;
+		
 
+        -- Reset
+        reset <= '1';
+        wait for clk_period;
+        reset <= '0';
+		
+		-- Check results
+        assert (SRCa = x"0000")
+        report "Error in reading REG[1]" severity error;
+
+        assert (SRCb = x"0000")
+        report "Error in reading REG[2]" severity error;
+		
         -- =====================================================
         -- 2) TEST WRITE
         -- =====================================================
@@ -88,6 +94,7 @@ begin
 		
 		wait for clk_period;
 		
+		RES <= x"1234";
         RdWEn <= '0';
 		wait for clk_period;
 		
@@ -98,7 +105,7 @@ begin
 
         wait for clk_period;
 
-        assert (SRCa = x"AAAA")
+        assert (SRCa = x"AAAA")	-- asyncronous read
         report "Write failed in REG[3]" severity error;
 
         -- =====================================================
@@ -111,6 +118,7 @@ begin
 
         wait for clk_period; 
 		
+		RES <= x"AAAA";
         RdWEn <= '0';
 		wait for clk_period;
 		
@@ -119,7 +127,7 @@ begin
 
         wait for clk_period;
 
-        assert (SRCa = x"1234")
+        assert (SRCa = x"1234")	-- asyncronous read
         report "Write failed in REG[15]" severity error;
 
         wait;
