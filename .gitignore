@@ -17,3 +17,13 @@ synthesis.order
 # Compiled output folders
 compile/
 log/
+
+# Compiled latex files
+*.aux
+*.log
+*.toc
+*.out
+*.synctex.gz
+*.dvi
+*.bbl
+*.blg
