@@ -1,0 +1,140 @@
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[scale=0.75, transform shape,
+    >=Stealth,
+    blk/.style={
+        draw=black!40, rounded corners=5pt,
+        minimum width=3cm, minimum height=1.2cm,
+        align=center, text=white,
+        font=\sffamily\footnotesize\bfseries,
+        fill=#1
+    },
+    lbl/.style={
+        font=\sffamily\scriptsize,
+        fill=white,
+        inner sep=2pt,
+        rounded corners=2pt
+    }
+]
+
+% =========================
+% TOP: INPUT
+% =========================
+\node[blk=clkcolor] (IN)
+{External Inputs\\ 
+        \texttt{CTRL[3:0]}\\[2pt]
+       \texttt{Ra[3:0]}\\[2pt]
+       \texttt{Rb[3:0]}\\[2pt]
+       \texttt{Rd[3:0]}\\[2pt]
+       \texttt{clock}\\[2pt]
+       \texttt{reset}};
+
+% =========================
+% PIPELINE
+% =========================
+\node[blk=pipecolor, below=1.8cm of IN] (PIPE)
+ {Input Pipeline\\Register\\[2pt]
+       \texttt{\tiny Process\_control}};
+
+\draw[->, thick] (IN) -- (PIPE)
+node[midway, right, lbl]{CTRL, Ra, Rb, Rd};
+
+% =========================
+% REGISTER FILE
+% =========================
+\node[blk=regcolor, below=2cm of PIPE] (REG)
+ {Register File\\$16 \times 16$-bit\\[2pt]
+       \texttt{\tiny R0 -- R15}};
+
+\draw[->, thick] (PIPE) -- (REG)
+node[midway, right, lbl]{addr/control};
+
+% =========================
+% FUNCTION UNITS (SIDE BY SIDE)
+% =========================
+\node[blk=alucolor, below=2cm of REG, xshift=-5cm] (ALU)
+ {ALU\\[2pt]
+       \texttt{\tiny ADD/SUB/AND}\\
+       \texttt{\tiny OR/XOR/NOT}\\
+       \texttt{\tiny MOV/NOP}};
+
+\node[blk=shiftcolor, right=2.5cm of ALU] (SHF)
+ {Shifter\\[2pt]
+       \texttt{\tiny ROR8 / ROR4 / SLL8}};
+
+\node[blk=lutcolor, right=2.5cm of SHF] (LUT)
+  {LUT / S-Box\\[2pt]
+       \texttt{\tiny SBOX\_1 (hi nibble)}\\
+       \texttt{\tiny SBOX\_2 (lo nibble)}};
+
+% =========================
+% ABUS (clean split)
+% =========================
+\draw[->, thick, color=regcolor]
+(REG.south) -- ++(0,-0.8) -| (ALU.north)
+node[pos=0.25, left, lbl]{ABUS};
+
+\draw[->, thick, color=regcolor]
+(REG.south) -- ++(0,-0.8) -| (LUT.north)
+node[pos=0.75, right, lbl]{ABUS[7:0]};
+
+% =========================
+% BBUS (FIXED PROPERLY)
+% =========================
+\draw[->, thick, color=regcolor]
+(REG.east) -- ++(1,0) |- (SHF.north)
+node[pos=0.4, right, lbl]{BBUS};
+
+\draw[->, thick, color=regcolor!70]
+(REG.east) -- ++(1,0) |- (ALU.north)
+node[pos=0.7, right, lbl]{BBUS};
+
+% =========================
+% MUX
+% =========================
+\node[blk=muxcolor, below=3cm of SHF] (MUX)
+ {Control\\MUX\\[6pt]
+       \texttt{\tiny CTRL[3]=0}\\
+       \texttt{\tiny $\rightarrow$ ALU}\\[3pt]
+       \texttt{\tiny "1011"}\\
+       \texttt{\tiny $\rightarrow$ LUT}\\[3pt]
+       \texttt{\tiny else}\\
+       \texttt{\tiny $\rightarrow$ Shifter}};
+
+% outputs to mux
+\draw[->, thick] (ALU.south) |- (MUX.west)
+node[pos=0.3, lbl]{ALU};
+
+\draw[->, thick] (SHF.south) -- (MUX)
+node[midway, right, lbl]{SHIFT};
+
+\draw[->, thick] (LUT.south) |- (MUX.east)
+node[pos=0.3, lbl]{LUT};
+
+% =========================
+% RESULT
+% =========================
+\node[blk=clkcolor, below=2cm of MUX] (RES)
+ {RESULT\\[2pt]\texttt{\tiny 16-bit bus}};
+
+\draw[->, very thick] (MUX) -- (RES)
+node[midway, right, lbl]{RES};
+
+% =========================
+% WRITE BACK (clean bottom loop)
+% =========================
+\draw[->, very thick, color=clkcolor]
+(RES.south) -- ++(0,-1.5) -- ++(-6,0) |- (REG.west)
+node[midway, below, lbl]{Write-back to Rd};
+
+% =========================
+% CONTROL (clean, no overlap)
+% =========================
+\draw[->, dashed]
+(PIPE.east) -- ++(2,0) |- (MUX.north)
+node[pos=0.7, lbl]{MUX sel};
+
+\end{tikzpicture}
+\caption{Detailed data-flow diagram of CryptoCore-16.}
+\label{fig:dataflow}
+\end{figure}
