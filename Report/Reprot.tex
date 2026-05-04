@@ -1391,6 +1391,23 @@ retrieves them by reading the register file through a separate bus-interface
 % ============================================================
 \chapter{Schematic Diagram}
 % ============================================================
+  \vspace{-0.5cm}
+
+\section{Active-HDL™ Functional Schematic}
+
+Prior to hardware synthesis, a functional schematic of the CryptoCore-16 was manually constructed within the Aldec Active-HDL™ as illustrated in Figure \ref{fig:active_hdl_schem}. This process allowed for a custom visualization of the RTL architecture, ensuring a clear mapping of the VHDL entities before simulation.
+
+\begin{figure}[H]
+    \centering
+    \makebox[\textwidth][c]{%
+         \includegraphics[width=1.1\textwidth]{Design_Schematic.png}%
+    }
+  \caption{Functional RTL schematic generated in Active-HDL.}
+  \label{fig:active_hdl_schem}
+  
+\end{figure}
+
+\newpage
 
 \section{Quartus® Prime Schematic Overview}
 
@@ -1400,12 +1417,13 @@ and the interconnection of all sub-components.
 
 
 \begin{figure}[H]
-  \centering
-    \includegraphics[width=1.1\textwidth]{top view schematic.png}
-  \caption{Top-level schematic of CryptoCore-16.}
+    \centering
+    \makebox[\textwidth][c]{%
+         \includegraphics[width=1.1\textwidth]{top view schematic.png}%
+    }
+     \caption{Top-level schematic of CryptoCore-16.}
   \label{fig:top_schem}
 \end{figure}
-
 
 
 
@@ -1892,13 +1910,6 @@ FPGA4Student,
 \url{https://www.fpga4student.com/2017/07/cryptographic-coprocessor-design-in-vhdl.html}
 [Accessed: Apr.~2026].
 
-\bibitem{github_repo}
-H.~Abd Elkarim,
-``CryptoCore-16: 16-bit Cryptographic Coprocessor Implemented in VHDL,''
-GitHub Repository, 2024.
-[Online]. Available:
-\url{https://github.com/hatemabd-elkarim/CryptoCore-16}
-[Accessed: Apr.~2026].
 
 \bibitem{joshi2014vhdl}
 R.~Joshi, N.~Naik, N.~Kashid, S.~Waykar, and C.~Rangrass,
@@ -1933,12 +1944,7 @@ T.~M. Kumar \textit{et al.},
 vol.~10, no.~16, p.~2023, Aug.~2021.
 DOI: \href{https://doi.org/10.3390/electronics10162023}{10.3390/electronics10162023}
 
-\bibitem{visconti2021aes}
-P.~Visconti, R.~Velazquez, S.~Capoccia, and R.~de~Fazio,
-``High-performance AES-128 algorithm implementation by FPGA-based SoC for 5G communications,''
-\textit{International Journal of Electrical and Computer Engineering},
-vol.~11, no.~5, pp.~4221--4232, Oct.~2021.
-DOI: \href{https://doi.org/10.11591/ijece.v11i5.pp4221-4232}{10.11591/ijece.v11i5.pp4221-4232}
+
 
 \bibitem{haroldo2024dynamic}
 C.~M. Haroldo, N.~C. David, M.~Madani, and E.~B. Bourennane,
@@ -1947,11 +1953,6 @@ in \textit{Proc. International Conference on Security and Cryptography},
 2024, pp.~730--737.
 DOI: \href{https://doi.org/10.5220/0012780300003767}{10.5220/0012780300003767}
 
-\bibitem{good2005aes}
-T.~Good and M.~Benaissa,
-``AES on FPGA — from the fastest to the smallest,''
-in \textit{Cryptographic Hardware and Embedded Systems – CHES 2005},
-pp.~427--440, 2005.
 
 \end{thebibliography}
 
