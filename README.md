@@ -37,11 +37,11 @@ Cryptographic algorithms require executing the same operations hundreds of thous
                     ┌──────────────────────────────┐
                     │                              │
     Clock ─────────►│   16x16 Register File        │
-    Reset ─────────►│   (Synchronous Read/Write)   │
+    Reset ─────────►│   (Async Read / Sync Write)  │
     Ra[3:0] ───────►│                              │
-    Rb[3:0] ───────►│   Ra ──► ABUS[15:0]          │
-    Rd[3:0] ───────►│   Rb ──► BBUS[15:0]          │
-                    │   Rd ◄── RESULT[15:0]        │
+    Rb[3:0] ───────►│   Ra ──► ABUS[15:0]  (async) │
+    Rd[3:0] ───────►│   Rb ──► BBUS[15:0]  (async) │
+                    │   Rd ◄── RESULT[15:0] (sync) │
                     │                              │
                     └────────┬──────────┬──────────┘
                              │          │
@@ -109,17 +109,17 @@ Rd   = 1100 (Register 12)
 
 1. **Input signals arrive** at the processor pins
 2. **Input register latches** on rising clock edge:
-   - `CTRL` → stored internally
-   - `Ra`, `Rb`, `Rd` → stored internally
-   - This creates a pipeline stage, stabilizing inputs during operation
+   - `CTRL` → stored internally as `ctrl_tmp`
+   - `Ra`, `Rb`, `Rd` → passed directly to register file
+   - This creates a pipeline stage, stabilizing the opcode during computation
 
 #### **Cycle N (Combinational Phase - same cycle)**
 
-3. **Register File Read** (synchronous read on same clock edge):
+3. **Register File Read** (asynchronous — zero latency, no clock required):
 
    ```
-   Ra = 0101 → Register[5] → ABUS = 0xF407
-   Rb = 0100 → Register[4] → BBUS = 0x1186
+   Ra = 0101 → Register[5] → ABUS = 0xF407   (immediate, combinational)
+   Rb = 0100 → Register[4] → BBUS = 0x1186   (immediate, combinational)
    ```
 
 4. **All three functional units operate in parallel** (combinational logic):
@@ -127,43 +127,49 @@ Rd   = 1100 (Register 12)
    **a) ALU receives ABUS and BBUS:**
    - CTRL = 0000 → Selects ADD operation
    - Calculation: `0xF407 + 0x1186 = 0x058D`
-   - Output: `alu_out1 = 0x058D`
+   - Output: `alu_out = 0x058D`
 
    **b) Shifter receives BBUS:**
-   - CTRL = 0000 → No shift operation (inactive)
-   - Output: `sft_out2 = (don't care)`
+   - CTRL = 0000 → No shift operation (output not selected by MUX)
+   - Output: `shift_out = (don't care)`
 
-   **c) Lookup Unit receives ABUS:**
-   - CTRL = 0000 → No LUT operation (inactive)
-   - Output: `lut_out3 = (don't care)`
+   **c) Lookup Unit receives ABUS[7:0]:**
+   - CTRL = 0000 → No LUT operation (output not selected by MUX)
+   - Output: `lut_out = (don't care)`
 
-5. **Control MUX selects correct output:**
+5. **Control MUX selects correct output** using a two-level nested case:
 
    ```vhdl
-   -- Control Logic
-   if CTRL[3] = '0' then
-       RESULT <= tmp_out1 (ALU output)
-   elsif CTRL[1:0] = "11" then
-       RESULT <= tmp_out3 (LUT output)
-   else
-       RESULT <= tmp_out2 (Shifter output)
-   end if
+   CONTROL_MUX: process(CTRL, ALU_OUT, SHIFT_OUT, LUT_OUT) is
+   begin
+       case(CTRL(3)) is
+           when '0' =>
+               RES <= ALU_OUT;       -- CTRL(3)='0': all ALU operations
+           when others =>
+               case(CTRL) is
+                   when "1011" =>
+                       RES <= LUT_OUT;   -- full match: LUT operation only
+                   when others =>
+                       RES <= SHIFT_OUT; -- all other CTRL(3)='1': Shifter
+               end case;
+       end case;
+   end process;
    ```
 
-   - Since CTRL[3] = '0', MUX selects `alu_out1`
+   - Since `CTRL(3) = '0'`, MUX selects `ALU_OUT`
    - `RESULT = 0x058D`
 
-6. **Write Enable Logic:**
+6. **Write Enable Logic** (inside `Process_control`, synchronous):
 
    ```vhdl
-   if CTRL = "0111" then  -- NOP instruction
-       Write_Enable <= '0'
+   if CTRL = "0111" then   -- NOP instruction
+       RdWEn <= '0';
    else
-       Write_Enable <= '1'
-   end if
+       RdWEn <= '1';
+   end if;
    ```
 
-   - CTRL ≠ 0111, so `Write_Enable = '1'`
+   - CTRL ≠ 0111, so `RdWEn = '1'`
 
 #### **Cycle N+1 (Write-back)**
 
@@ -174,22 +180,22 @@ Rd   = 1100 (Register 12)
    Register[12] ← 0x058D
    ```
 
-   - Write only occurs if `Write_Enable = '1'`
-   - Write is synchronous (happens on clock edge)
+   - Write only occurs if `RdWEn = '1'`
+   - Write is synchronous (happens on rising clock edge)
 
 ### Data Path Summary
 
 ```
-Input Pins → Input Register → Register File (Read) → ABUS/BBUS
-                                                         ↓
-                                              Combinational Block
-                                             (ALU/Shifter/LUT)
-                                                         ↓
-                                                Control MUX
-                                                         ↓
-                                                     RESULT
-                                                         ↓
-                                              Register File (Write)
+Input Pins → Input Register → Register File (Async Read) → ABUS/BBUS
+                                                               ↓
+                                                  Combinational Block
+                                                 (ALU/Shifter/LUT — parallel)
+                                                               ↓
+                                                        Control MUX
+                                                               ↓
+                                                           RESULT
+                                                               ↓
+                                                Register File (Sync Write)
 ```
 
 ---
@@ -198,15 +204,16 @@ Input Pins → Input Register → Register File (Read) → ABUS/BBUS
 
 ### 1. Input Register (Pipeline Stage)
 
-**File:** `Crypto_core16.vhd` (internal process)
+**File:** `crypto_core16.vhd` (internal `Process_control` process)
 
-**Purpose:** Stabilizes control signals and register addresses
+**Purpose:** Stabilizes the opcode and generates write-enable
 
 **Why it exists:**
 
-- Prevents timing issues by registering inputs
-- Creates a stable control environment during computation
-- Implements a simple pipeline stage
+- Prevents timing glitches by registering `CTRL` into `ctrl_tmp` before feeding it to the combinational block
+- Creates a stable, glitch-free control environment during computation
+- Generates `RdWEn`: asserted high for all instructions except NOP (`"0111"`)
+- On reset: forces `ctrl_tmp` to NOP and de-asserts `RdWEn` — system starts in a safe quiescent state
 
 ---
 
@@ -218,9 +225,37 @@ Input Pins → Input Register → Register File (Read) → ABUS/BBUS
 
 - **Size:** 16 registers × 16 bits = 256 bits total
 - **Addressing:** 4-bit addresses (Ra, Rb, Rd)
-- **Read Ports:** 2 (Ra → ABUS, Rb → BBUS)
-- **Write Ports:** 1 (RESULT → Rd)
-- **Operation:** Synchronous read and write
+- **Read Ports:** 2 (Ra → ABUS, Rb → BBUS) — **asynchronous, zero latency**
+- **Write Ports:** 1 (RESULT → Rd) — **synchronous, rising edge**
+- **Reset:** Asynchronous — clears all registers to `0x0000` immediately, independent of clock
+
+**Read vs Write behaviour:**
+
+| Operation | Timing | Latency |
+|-----------|--------|---------|
+| Read (Ra, Rb) | Asynchronous (concurrent signal assignment) | Zero — output updates instantly when address changes |
+| Write (Rd)    | Synchronous (rising clock edge, gated by RdWEn) | 1 clock cycle |
+| Reset         | Asynchronous (immediate, no clock needed) | Zero |
+
+**VHDL implementation:**
+
+```vhdl
+-- WRITE: synchronous, clock-gated
+write_operation: process(clock, reset)
+begin
+    if reset = '1' then                          -- async reset: immediate
+        REG_FILE <= (others => x"0000");
+    elsif rising_edge(clock) then
+        if RdWEn = '1' then
+            REG_FILE(to_integer(unsigned(Rd))) <= RES;
+        end if;
+    end if;
+end process;
+
+-- READ: asynchronous, zero latency (concurrent statements outside process)
+SRCa <= REG_FILE(to_integer(unsigned(Ra)));
+SRCb <= REG_FILE(to_integer(unsigned(Rb)));
+```
 
 **Pre-initialized Dummy Values:**
 
@@ -254,10 +289,11 @@ R7  = 0x4706    R15 = 0xB000
 
 **Characteristics:**
 
-- **Purely combinational** - no clock required
+- **Purely combinational** — no clock required
 - Output updates immediately when inputs change
 - Uses `numeric_std` for arithmetic (cleaner than instantiating adders)
 - All 16-bit operations
+- All ALU opcodes share `CTRL(3) = '0'` — this single bit is the primary MUX selector
 
 ---
 
@@ -298,8 +334,8 @@ After:  [1010 0000] [0000 0000]
 
 **Key Difference:**
 
-- **Rotate:** Bits wrap around, nothing is lost
-- **Shift:** Bits fall off the edge, zeros fill in
+- **Rotate:** Bits wrap around — nothing is lost
+- **Shift:** Bits fall off the edge — zeros fill in
 
 ---
 
@@ -308,7 +344,7 @@ After:  [1010 0000] [0000 0000]
 **File:** `LUT.vhd`
 
 **Purpose:**
-Provides non-linear substitution - a critical component of secure encryption. Linear operations (XOR, ADD) can be reversed algebraically. Non-linear substitution breaks this pattern.
+Provides non-linear substitution — a critical component of secure encryption. Linear operations (XOR, ADD) can be reversed algebraically. Non-linear substitution breaks this pattern.
 
 **Data Flow:**
 
@@ -327,13 +363,14 @@ ABUS[15:0] input
          ABUS[15:8] & [S_Box1_out & S_Box2_out]
                  │
                  ▼
-          LUTOUT[15:0]
+          LUT_OUT[15:0]
 ```
 
 **Why Non-Linear?**
 
 - Makes the encryption mathematically irreversible without the key
 - Prevents attacks based on linear algebra
+- Executes in a single combinational pass — no data-dependent branches, making it inherently resistant to timing side-channel attacks
 - These specific S-Boxes are simplified versions for demonstration
 
 ---
@@ -343,16 +380,40 @@ ABUS[15:0] input
 **File:** `combinational_logic_block.vhd`
 
 **Purpose:**
-Integrates ALU, Shifter, and LUT with output multiplexing
+Integrates ALU, Shifter, and LUT structurally, then routes the correct result through a priority-encoded control MUX.
 
-**Control unit MUX Selection Logic:**
+**Key behaviour:** All three units compute their results **simultaneously every cycle**. The MUX only selects which result to forward — it does not gate or disable any unit.
 
+**Control MUX Selection Logic (actual VHDL):**
+
+```vhdl
+CONTROL_MUX: process(CTRL, ALU_OUT, SHIFT_OUT, LUT_OUT) is
+begin
+    case(CTRL(3)) is
+        when '0' =>
+            RES <= ALU_OUT;          -- CTRL(3)='0': all 8 ALU opcodes (0000–0111)
+        when others =>
+            case(CTRL) is
+                when "1011" =>
+                    RES <= LUT_OUT;  -- exact match "1011": LUT only
+                when others =>
+                    RES <= SHIFT_OUT;-- all other CTRL(3)='1': Shifter
+            end case;
+    end case;
+end process;
 ```
-CTRL[3] = 0  →  ALU output     (operations 0000-0111)
-CTRL[3] = 1:
-    CTRL[1:0] = 11  →  LUT output     (operation 1011)
-    CTRL[1:0] ≠ 11  →  Shifter output (operations 1000, 1001, 1010)
-```
+
+**Selection summary:**
+
+| Condition | Selected Output | Covers |
+|-----------|----------------|--------|
+| `CTRL(3) = '0'` | `ALU_OUT` | Opcodes 0000–0111 (8 instructions) |
+| `CTRL = "1011"` | `LUT_OUT` | Opcode 1011 only (1 instruction) |
+| `CTRL(3)='1'`, not `"1011"` | `SHIFT_OUT` | Opcodes 1000, 1001, 1010 (3 instructions) |
+
+> **Why two levels?** `CTRL(3)` alone gates the entire ALU half in a single bit check. The second level only needs to distinguish LUT (`"1011"`) from Shifter among the remaining opcodes. This minimizes logic depth.
+
+**Synthesis note:** Quartus implements this as **16 parallel 1-bit MUX chains** (Mux0–Mux15 in the RTL schematic) — one per output bit — all sharing the same `CTRL` select signal.
 
 ---
 
@@ -361,13 +422,38 @@ CTRL[3] = 1:
 **File:** `crypto_core16.vhd`
 
 **Purpose:**
-Connects register file, combinational logic, and control logic
+Connects the register file, combinational logic block, and pipeline control logic into the complete coprocessor.
 
 **Key Features:**
 
-- Input pipeline register
-- Write enable control (disables writes for NOP)
-- Complete data path integration
+- Input pipeline register (`Process_control`) — registers `CTRL` into `ctrl_tmp` on rising edge
+- Write enable control — `RdWEn` de-asserted for NOP, asserted for all other opcodes
+- Asynchronous reset propagated to register file — clears all registers immediately
+- **No output ports** — all results reside inside the register file; host retrieves data through a separate bus interface
+
+**`Process_control` (synchronous pipeline register with async-reset-aware design):**
+
+```vhdl
+Process_control : process(clock)
+begin
+    if rising_edge(clock) then
+        if reset = '1' then
+            ctrl_tmp <= "0111";   -- force NOP on reset
+            RdWEn    <= '0';      -- disable write on reset
+        else
+            ctrl_tmp <= CTRL;     -- register the opcode
+
+            if CTRL = "0111" then
+                RdWEn <= '0';     -- NOP: suppress write-back
+            else
+                RdWEn <= '1';     -- all other ops: enable write-back
+            end if;
+        end if;
+    end if;
+end process;
+```
+
+> Note: The pipeline register itself is synchronous. The asynchronous reset is handled in the register file, which clears all stored data immediately on `reset = '1'` independent of the clock.
 
 ---
 
@@ -424,7 +510,7 @@ LUT R9, R2        ; CTRL=1011, Ra=1001, Rb=xxxx, Rd=0010
 ROR4 R12, R0      ; CTRL=1001, Ra=xxxx, Rb=1100, Rd=0000
 ADD  R0, R7, R10  ; CTRL=0000, Ra=0000, Rb=0111, Rd=1010
 ; First: Rotate R12 right 4 bits → R0
-; Then: Add R0 + R7 → R10
+; Then:  Add R0 + R7 → R10
 ```
 
 ---
@@ -484,7 +570,7 @@ Result = 0x6 & 0x3 = 0x63
 **Final Output:**
 
 ```
-LUTOUT = ABUS[15:8] & 0x63 = 0xAB63
+LUT_OUT = ABUS[15:8] & 0x63 = 0xAB63
 ```
 
 ---
@@ -495,7 +581,7 @@ LUTOUT = ABUS[15:8] & 0x63 = 0xAB63
 
 ```
 Address | Value  | Hex View
---------|--------|-------------
+--------|--------|---------------------
 R0      | 0x0001 | 0000 0000 0000 0001
 R1      | 0xC505 | 1100 0101 0000 0101
 R2      | 0x3C07 | 0011 1100 0000 0111
@@ -513,5 +599,3 @@ R13     | 0xC902 | 1100 1001 0000 0010
 R14     | 0x100B | 0001 0000 0000 1011
 R15     | 0xB000 | 1011 0000 0000 0000
 ```
-
----
