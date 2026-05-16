@@ -9,7 +9,6 @@ architecture behavior of tb_crypto is
 
     signal clock, reset : std_logic := '0';
     signal CTRL, Ra, Rb, Rd : std_logic_vector(3 downto 0);	 
-	signal ABUS, BBUS, RES : std_logic_vector(15 downto 0);
 
 begin
 
