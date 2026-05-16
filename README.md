@@ -235,22 +235,22 @@ Input Pins → Input Register → Register File (Async Read) → ABUS/BBUS
 |-----------|--------|---------|
 | Read (Ra, Rb) | Asynchronous (concurrent signal assignment) | Zero — output updates instantly when address changes |
 | Write (Rd)    | Synchronous (rising clock edge, gated by RdWEn) | 1 clock cycle |
-| Reset         | Asynchronous (immediate, no clock needed) | Zero |
+| Reset         | synchronous (rising clock edge) | 1 clock cycle |
 
 **VHDL implementation:**
 
 ```vhdl
 -- WRITE: synchronous, clock-gated
-write_operation: process(clock, reset)
+write_operation: process(clock)
 begin
-    if reset = '1' then                          -- async reset: immediate
-        REG_FILE <= (others => x"0000");
-    elsif rising_edge(clock) then
-        if RdWEn = '1' then
+    if rising_edge(clock) then
+        if reset = '1' then	-- syncronous reset, with higher priority
+            REG_FILE <= (others => x"0000");
+        elsif RdWEn = '1' then
             REG_FILE(to_integer(unsigned(Rd))) <= RES;
         end if;
     end if;
-end process;
+	end process;
 
 -- READ: asynchronous, zero latency (concurrent statements outside process)
 SRCa <= REG_FILE(to_integer(unsigned(Ra)));
@@ -428,10 +428,10 @@ Connects the register file, combinational logic block, and pipeline control logi
 
 - Input pipeline register (`Process_control`) — registers `CTRL` into `ctrl_tmp` on rising edge
 - Write enable control — `RdWEn` de-asserted for NOP, asserted for all other opcodes
-- Asynchronous reset propagated to register file — clears all registers immediately
+- synchronous reset propagated to register file — clears all registers on clock edge
 - **No output ports** — all results reside inside the register file; host retrieves data through a separate bus interface
 
-**`Process_control` (synchronous pipeline register with async-reset-aware design):**
+**`Process_control` (synchronous pipeline register with sync-reset-aware design):**
 
 ```vhdl
 Process_control : process(clock)
@@ -452,9 +452,6 @@ begin
     end if;
 end process;
 ```
-
-> Note: The pipeline register itself is synchronous. The asynchronous reset is handled in the register file, which clears all stored data immediately on `reset = '1'` independent of the clock.
-
 ---
 
 ## Instruction Set
